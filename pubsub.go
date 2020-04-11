@@ -1,3 +1,7 @@
+/*
+This is inspired by https://github.com/tabvn/golang-pubsub-youtube
+ */
+
 package udspubsub
 
 import (
