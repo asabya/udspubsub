@@ -14,7 +14,7 @@ type PubSubClient struct {
 	c net.Conn
 }
 
-func autoId() (string) {
+func autoId() string {
 	return uuid.Must(uuid.NewV4(), nil).String()
 }
 
@@ -25,25 +25,23 @@ func Listener(socketPath string) *PubSubHandler {
 		log.Fatal(err)
 	}
 	go func() {
-		defer func() {
-			log.Println("listener defer called")
-			l.Close()
-		}()
+		defer l.Close()
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				log.Fatal(err)
+				return
 			}
 			client := ps.handleConnection(conn)
 			go func() {
-				b := make([]byte, MAX_BUFFER)
-				n, err := conn.Read(b)
-				if err != nil {
-					log.Println("Read error :", err.Error())
-					return
+				for {
+					b := make([]byte, MAX_BUFFER)
+					n, err := conn.Read(b)
+					if err != nil {
+						return
+					}
+					ps.handleReceiveMessage(client, b[:n])
+					b = nil
 				}
-				ps.handleReceiveMessage(client, b[:n])
-				b = nil
 			}()
 		}
 	}()
@@ -64,6 +62,7 @@ func NewPubSubClient(socketPath string) (*PubSubClient, error){
 		ID: string(b[:n]),
 		c:  c,
 	}
+	b = nil
 	return p, nil
 }
 
@@ -96,21 +95,32 @@ func (p *PubSubClient) Subscribe(topic string) (chan string, error) {
 }
 
 func (p *PubSubClient) Publish(topic string, message []byte) error {
-	log.Println("Publish : ", topic, string(message))
 	payload, err := json.Marshal(Message{
 		Action:  PUBLISH,
 		Topic:   topic,
 		Message: message,
 	})
 	if err != nil {
-		log.Println("Marshal failed", err.Error())
 		return err
 	}
 	_, err = p.c.Write(payload)
 	if err != nil {
-		log.Println("Write failed", err.Error())
 		return err
 	}
 	return nil
 }
 
+func (p *PubSubClient) Unsubscribe(topic string) error {
+	payload, err := json.Marshal(Message{
+		Action:  UNSUBSCRIBE,
+		Topic:   topic,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = p.c.Write(payload)
+	if err != nil {
+		return err
+	}
+	return nil
+}

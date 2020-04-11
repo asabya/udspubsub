@@ -1,7 +1,6 @@
 package udspubsub
 
 import (
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -46,46 +45,40 @@ func TestSubscription(t *testing.T) {
 		t.Fatalf("Client Subscription failed : %s", err.Error())
 	}
 	clientOneChannel = chanOne
+	<-time.After(time.Second * 1)
 	clientTwoChannel, err = clientTwo.Subscribe("TopicTwo")
 	if err != nil {
 		t.Fatalf("Client Subscription failed : %s", err.Error())
 	}
-	<-time.After(time.Second * 5)
-
+	<-time.After(time.Second * 1)
 	if len(ps.Subscriptions) != 2 {
 		t.Fatalf("Subscription count should be two, its %d", len(ps.Subscriptions))
-	}
-	for i, v := range ps.Subscriptions {
-		log.Println(i, v.Client.Id)
 	}
 }
 
 func TestClientThreePublishClientOne(t *testing.T) {
 	m := "This is a message to Topic one"
-	go func() {
-		message := <-clientOneChannel
-		if m != message {
-			t.Fatal("Got wrong message")
-		}
-	}()
+
 	err := clientThree.Publish("TopicOne", []byte(m))
 	if err != nil {
 		t.Fatalf("Publish failed : %s", err.Error())
+	}
+	message := <-clientOneChannel
+	if m != message {
+		t.Fatal("Got wrong message")
 	}
 	<-time.After(time.Second * 1)
 }
 
 func TestClientThreePublishClientTwo(t *testing.T) {
 	m := "This is a message to Topic two"
-	go func() {
-		message := <-clientTwoChannel
-		if m != message {
-			t.Fatal("Got wrong message")
-		}
-	}()
 	err := clientThree.Publish("TopicTwo", []byte(m))
 	if err != nil {
 		t.Fatalf("Publish failed : %s", err.Error())
+	}
+	message := <-clientTwoChannel
+	if m != message {
+		t.Fatal("Got wrong message")
 	}
 	<-time.After(time.Second * 1)
 }
@@ -108,4 +101,37 @@ func TestClientThreeSubscribe(t *testing.T) {
 		t.Fatalf("Publish failed : %s", err.Error())
 	}
 	<-time.After(time.Second * 1)
+}
+
+func TestClientUnSubscribe(t *testing.T) {
+	var err error
+	err = clientThree.Unsubscribe("TopicThree")
+	if err != nil {
+		t.Fatalf("Client Unsubscribe failed : %s", err.Error())
+	}
+
+	<-time.After(time.Second * 1)
+	if len(ps.Subscriptions) != 2 {
+		t.Fatalf("Subscription count should be two, its %d", len(ps.Subscriptions))
+	}
+
+	err = clientTwo.Unsubscribe("TopicTwo")
+	if err != nil {
+		t.Fatalf("Client Unsubscribe failed : %s", err.Error())
+	}
+
+	<-time.After(time.Second * 1)
+	if len(ps.Subscriptions) != 1 {
+		t.Fatalf("Subscription count should be one, its %d", len(ps.Subscriptions))
+	}
+
+	err = clientOne.Unsubscribe("TopicOne")
+	if err != nil {
+		t.Fatalf("Client Unsubscribe failed : %s", err.Error())
+	}
+
+	<-time.After(time.Second * 1)
+	if len(ps.Subscriptions) != 0 {
+		t.Fatalf("Subscription count should be zero, its %d", len(ps.Subscriptions))
+	}
 }

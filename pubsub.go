@@ -41,9 +41,7 @@ func (ps *PubSubHandler) handleConnection(c net.Conn) Client {
 		Id:         autoId(),
 		Connection: c,
 	}
-
 	ps.addClient(client)
-	log.Println("New Client is connected, total: ", len(ps.Clients))
 	return client
 }
 
@@ -56,13 +54,11 @@ func (ps *PubSubHandler) addClient(client Client) error {
 }
 
 func (ps *PubSubHandler) removeClient(client Client) {
-	// first remove all subscriptions by this client
 	for index, sub := range ps.Subscriptions {
 		if client.Id == sub.Client.Id {
 			ps.Subscriptions = append(ps.Subscriptions[:index], ps.Subscriptions[index+1:]...)
 		}
 	}
-	// remove client from the list
 	for index, c := range ps.Clients {
 		if c.Id == client.Id {
 			ps.Clients = append(ps.Clients[:index], ps.Clients[index+1:]...)
@@ -92,10 +88,8 @@ func (ps *PubSubHandler) GetClientSubscriptions(client *Client) ([]Subscription)
 
 func (ps *PubSubHandler) IsClientSubscribed(topic string, client *Client) bool {
 	for _, subscription := range ps.Subscriptions {
-		if client != nil {
-			if subscription.Client.Id == client.Id && subscription.Topic == topic {
-				return true
-			}
+		if subscription.Client.Id == client.Id && subscription.Topic == topic {
+			return true
 		}
 	}
 
@@ -103,20 +97,18 @@ func (ps *PubSubHandler) IsClientSubscribed(topic string, client *Client) bool {
 }
 
 func (ps *PubSubHandler) subscribe(client *Client, topic string) {
-	if ps.IsClientSubscribed(topic, client) {
-		return
+	if !ps.IsClientSubscribed(topic, client) {
+		newSubscription := Subscription{
+			Topic:  topic,
+			Client: client,
+		}
+		ps.Subscriptions = append(ps.Subscriptions, newSubscription)
 	}
-	newSubscription := Subscription{
-		Topic:  topic,
-		Client: client,
-	}
-	ps.Subscriptions = append(ps.Subscriptions, newSubscription)
 }
 
 func (ps *PubSubHandler) publish(topic string, message []byte, excludeClient *Client) {
 	subscriptions := ps.GetTopicSubscriptions(topic)
 	for _, sub := range subscriptions {
-		log.Printf("Sending to client id %s message is %s \n", sub.Client.Id, message)
 		sub.Client.send(message)
 	}
 }
@@ -129,7 +121,6 @@ func (client *Client) send(message [] byte) (error) {
 func (ps *PubSubHandler) unsubscribe(client *Client, topic string) {
 	for index, sub := range ps.Subscriptions {
 		if sub.Client.Id == client.Id && sub.Topic == topic {
-			// found this subscription from client and we do need remove it
 			ps.Subscriptions = append(ps.Subscriptions[:index], ps.Subscriptions[index+1:]...)
 		}
 	}
@@ -137,7 +128,6 @@ func (ps *PubSubHandler) unsubscribe(client *Client, topic string) {
 
 func (ps *PubSubHandler) handleReceiveMessage(client Client, payload []byte) error {
 	m := Message{}
-
 	err := json.Unmarshal(payload, &m)
 	if err != nil {
 		log.Println("This is not correct message payload ", err.Error() )
@@ -150,7 +140,6 @@ func (ps *PubSubHandler) handleReceiveMessage(client Client, payload []byte) err
 			log.Println("No subscribers for this topic")
 			break
 		}
-		log.Println("This is publish new message")
 		ps.publish(m.Topic, m.Message, nil)
 		break
 
@@ -159,11 +148,9 @@ func (ps *PubSubHandler) handleReceiveMessage(client Client, payload []byte) err
 			Topics = append(Topics, m.Topic)
 		}
 		ps.subscribe(&client, m.Topic)
-		log.Println("new subscriber to topic", m.Topic, len(ps.Subscriptions), client.Id)
 		break
 
 	case UNSUBSCRIBE:
-		log.Println("Client want to unsubscribe the topic", m.Topic, client.Id)
 		ps.unsubscribe(&client, m.Topic)
 		break
 
