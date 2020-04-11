@@ -42,7 +42,6 @@ func Listener(socketPath string) *PubSubHandler {
 					log.Println("Read error :", err.Error())
 					return
 				}
-				log.Println("4")
 				ps.handleReceiveMessage(client, b[:n])
 				b = nil
 			}()
